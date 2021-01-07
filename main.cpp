@@ -25,6 +25,17 @@ static inline void rtrim(std::string &s) {
           s.end());
 }
 
+inline string c_black(string s) { return "\033[30m" + s + "\033[39m"; }
+inline string c_red(string s) { return "\033[31m" + s + "\033[39m"; }
+inline string c_green(string s) { return "\033[32m" + s + "\033[39m"; }
+inline string c_brown(string s) { return "\033[33m" + s + "\033[39m"; }
+inline string c_blue(string s) { return "\033[34m" + s + "\033[39m"; }
+inline string c_magenta(string s) { return "\033[35m" + s + "\033[39m"; }
+inline string c_cyan(string s) { return "\033[36m" + s + "\033[39m"; }
+inline string c_white(string s) { return "\033[37m" + s + "\033[39m"; }
+inline string c_bold(string s) { return "\033[1m" + s + "\033[22m"; }
+inline string c_half_bright(string s) { return "\033[2m" + s + "\033[22m"; }
+
 struct Token {
   enum Type { literal, tree_node_nesting_value, todo, next, done } type;
   string str_value;
@@ -49,33 +60,34 @@ vector<Token> tokenize(istream &s) {
       const string after(it, line.end());
       line = after;
     }
-    const auto extract_status_token = [&](const char *token_str,
+    const auto extract_status_token = [&](const string &token_str,
                                           Token::Type type) {
-      if (const auto pos = line.find(token_str); pos == 0) {
-        const string before(line.begin(), next(line.begin(), pos));
-        const string empty{};
-        tokens.emplace_back(Token::todo, empty, 0);
-        const auto after_begin = next(line.begin(), pos + 5);
-        if (after_begin < line.end()) {
-          const string after(after_begin, line.end());
-          line = after;
-        } else {
-          line = "";
-        }
+      if (line.find(token_str) == 0) {
+        tokens.emplace_back(type, string{}, 0);
+        return true;
       }
+      return false;
     };
-    extract_status_token("TODO", Token::todo);
-    extract_status_token("NEXT", Token::next);
-    extract_status_token("DONE", Token::done);
-    if (!line.empty()) {
-      tokens.emplace_back(Token::literal, line, 0);
+    bool has_status = extract_status_token("TODO", Token::todo);
+    has_status |= extract_status_token("NEXT", Token::next);
+    has_status |= extract_status_token("DONE", Token::done);
+    if (has_status) {
+      const auto after_begin = next(line.begin(), 5);
+      if (after_begin < line.end()) {
+        const string after(after_begin, line.end());
+        line = after;
+      } else {
+        line = "";
+      }
     }
+    tokens.emplace_back(Token::literal, line, 0);
   }
   return tokens;
 }
 
 struct Leaf {
   enum State { _, TODO, NEXT, DONE } state{_};
+  string title{};
   string str{};
   size_t level{0};
   bool has_TODO_child{false};
@@ -120,19 +132,28 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       current_level = l.level;
     }
   };
+  bool parsing_title{true};
   for (const auto &t : tokens) {
     Leaf &current = children.back();
     // cout << "///" << endl;
     if (t.type == Token::literal) {
-      string s = current.str;
+      if (t.str_value.empty()) {
+        parsing_title = false;
+        continue;
+      }
+      string s = parsing_title ? current.title : current.str;
       // cout << "current = " << s << ", with size " << s.size() << endl;
       // cout << "t.s = " << t.str_value << ", with size" << t.str_value.size()
       // << endl;
       if (!s.empty()) {
-        s += "\n";
+        s += parsing_title ? " " : "\n";
       }
       s.append(t.str_value);
-      current.str = s;
+      if (parsing_title) {
+        current.title = s;
+      } else {
+        current.str = s;
+      }
       // cout << "current = " << current.str << endl;
     } else if (t.type == Token::todo) {
       current.state = Leaf::TODO;
@@ -150,6 +171,7 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       Leaf l{};
       l.level = t.int_value;
       children.push_back(l);
+      parsing_title = true;
       // cout << "NEW LEAF:" << l.level << endl;
     }
   }
@@ -181,18 +203,47 @@ int main(int argc, char **argv) {
       continue;
     }
   }
+  if (arguments[2] != "TODO" && arguments[2] != "NEXT") {
+    cout << "Unknown state tag:'" << arguments[2] << "'" << endl;
+    display_help(arguments.front());
+    return -1;
+  }
   ifstream file(arguments[1]);
   const auto tokens = tokenize(file);
   const auto tree = parse_tree(tokens, compact);
 
+  size_t max_level = 0;
   for (const auto &t : tree) {
     if ((arguments[2] == "TODO" && t.has_TODO_child) ||
         (arguments[2] == "NEXT" && t.has_NEXT_child)) {
-      cout << string(t.level, '*') << " ";
-      if (t.state != Leaf::State::_) {
-        cout << to_string(t.state) << " ";
+      max_level = max(max_level, t.level);
+    }
+  }
+  for (const auto &t : tree) {
+    if ((arguments[2] == "TODO" && t.has_TODO_child) ||
+        (arguments[2] == "NEXT" && t.has_NEXT_child)) {
+      if (t.level == 1 && !compact) {
+        cout << endl;
       }
-      cout << t.str << endl;
+      if (t.level > 0) {
+        cout << c_half_bright(string(t.level - 1, '*')) << c_bold({"*"})
+             << c_blue(c_half_bright(string(max_level - t.level, '.'))) << " ";
+      }
+      if (t.state != Leaf::State::_) {
+        if (t.state == Leaf::State::DONE) {
+          cout << c_bold(c_blue(to_string(t.state))) << " ";
+        } else {
+          cout << c_bold(c_green(to_string(t.state))) << " ";
+        }
+      }
+      cout << t.title;
+      if (!compact) {
+        cout << endl << c_half_bright(t.str);
+      }
+      cout << endl;
+      if (!compact) {
+        cout << endl;
+      }
     }
   }
   return 0;
