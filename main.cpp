@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 #include <locale>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -25,6 +24,19 @@ inline void rtrim(std::string &s) {
 }
 // end copy of
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+// string utils from
+// https://codereview.stackexchange.com/questions/239310/improving-function-that-replaces-all-instances-of-x-with-y-in-string
+namespace utils {
+using WordPair = std::pair<std::string_view, std::string_view>;
+inline void replace_all(std::string &string, const WordPair &pr) {
+  for (std::size_t start_pos{0};
+       (start_pos = string.find(pr.first, start_pos)) != std::string::npos;
+       start_pos += pr.second.length()) {
+    string.replace(start_pos, pr.first.length(), pr.second);
+  }
+}
+} // namespace utils
+// end copy
 // ansi colors
 inline string c_black(string s) { return "\033[30m" + s + "\033[39m"; }
 inline string c_red(string s) { return "\033[31m" + s + "\033[39m"; }
@@ -223,13 +235,12 @@ int main(int argc, char **argv) {
         cout << c_bold(c_green(to_string(t.state))) << " ";
       }
       cout << t.title;
-      if (!compact && !t.str.empty()) {
-        const string filler = string(t.level - 1, '|') + "." +
+      if (!compact && !t.str.empty() && t.level > 0) {
+        const string filler = string(t.level - 1, '|') + "|" +
                               string(max_level - t.level, ' ') + " " + "     ";
-        cout << endl
-             << c_half_bright(c_blue(filler))
-             << c_half_bright(
-                    regex_replace(t.str, regex{"\n"}, "\n" + c_blue(filler)));
+        string text = t.str;
+        utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
+        cout << endl << c_half_bright(c_blue(filler)) << c_half_bright(text);
       }
       cout << endl;
     }
