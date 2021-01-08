@@ -100,6 +100,7 @@ struct Leaf {
   size_t level{0};
   bool has_TODO_child{false};
   bool has_NEXT_child{false};
+  bool is_goal{false};
 };
 string to_string(Leaf::State s) {
   switch (s) {
@@ -123,6 +124,7 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
   const auto mark_parents = [&](Leaf::State s) {
     size_t marking_level = children.back().level;
     size_t current_level = marking_level + 1;
+    bool found_goal = false;
     for (auto it = children.rbegin(); it != children.rend(); ++it) {
       auto &l = *it;
       if (l.level >= current_level)
@@ -133,6 +135,10 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
         l.has_NEXT_child = true;
       } else if (s == Leaf::TODO) {
         l.has_TODO_child = true;
+      }
+      if (!found_goal && l.level < marking_level) {
+        l.is_goal = true;
+        found_goal = true;
       }
       current_level = l.level;
     }
@@ -226,7 +232,9 @@ int main(int argc, char **argv) {
       } else {
         cout << (string(max_level + 1, ' '));
       }
-      if (t.state == Leaf::State::DONE) {
+      if (t.is_goal) {
+        cout << c_bold(c_magenta("GOAL")) << " ";
+      } else if (t.state == Leaf::State::DONE) {
         cout << c_bold(c_blue(to_string(t.state))) << " ";
       } else {
         cout << c_bold(c_green(to_string(t.state))) << " ";
