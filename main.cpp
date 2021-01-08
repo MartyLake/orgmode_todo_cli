@@ -1,9 +1,5 @@
-#include <algorithm>
-#include <cassert>
 #include <fstream>
 #include <iostream>
-#include <locale>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -116,8 +112,7 @@ string to_string(Leaf::State s) {
   case Leaf::State::DONE:
     return "DONE";
   }
-  assert("unimplemented");
-  return "UNIMPLEMENTED";
+  return "*UNIMPLEMENTED*";
 }
 vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
   vector<Leaf> children;
@@ -228,6 +223,8 @@ int main(int argc, char **argv) {
       if (t.level > 0) {
         cout << c_half_bright(string(t.level - 1, '|')) << c_bold({"*"})
              << c_blue(c_half_bright(string(max_level - t.level, '.'))) << " ";
+      } else {
+        cout << (string(max_level + 1, ' '));
       }
       if (t.state == Leaf::State::DONE) {
         cout << c_bold(c_blue(to_string(t.state))) << " ";
