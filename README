@@ -1,0 +1,5 @@
+# orgmode_todo_cli
+
+a simple utility to quickly glance at the current TODO and NEXT in an org file.
+
+current implementation is very naive. please open an issue with a minimal orgfile if some files are not compatible.
