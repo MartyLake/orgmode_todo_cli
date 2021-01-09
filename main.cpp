@@ -3,57 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "orgparse.hpp"
 #include "string_utils.hpp"
 
 using namespace std;
-// tokenizer
-struct Token {
-  enum Type { literal, tree_node_nesting_value, todo, next, done } type;
-  string str_value;
-  size_t int_value;
-};
-vector<Token> tokenize(istream &s) {
-  vector<Token> tokens;
-  string line;
-  while (getline(s, line)) {
-    if (auto it =
-            find_if(line.begin(), line.end(), [](char c) { return c != '*'; });
-        it != line.begin()) {
-      const string before(line.begin(), it);
-      const size_t nest_level = count(before.begin(), before.end(), '*');
-      tokens.emplace_back(Token::tree_node_nesting_value, before, nest_level);
-      if (it == line.end())
-        continue;
-      ++it;
-      if (it == line.end())
-        continue;
-      const string after(it, line.end());
-      line = after;
-    }
-    const auto extract_status_token = [&](const string &token_str,
-                                          Token::Type type) {
-      if (line.find(token_str) == 0) {
-        tokens.emplace_back(type, string{}, 0);
-        return true;
-      }
-      return false;
-    };
-    bool has_status = extract_status_token("TODO", Token::todo);
-    has_status |= extract_status_token("NEXT", Token::next);
-    has_status |= extract_status_token("DONE", Token::done);
-    if (has_status) {
-      const auto after_begin = next(line.begin(), 5);
-      if (after_begin < line.end()) {
-        const string after(after_begin, line.end());
-        line = after;
-      } else {
-        line = "";
-      }
-    }
-    tokens.emplace_back(Token::literal, line, 0);
-  }
-  return tokens;
-}
 // parser
 struct Leaf {
   enum State { _, TODO, NEXT, DONE } state{_};
@@ -131,7 +84,7 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       }
       s.append(t.str_value);
       if (parsing_title) {
-        trim(s);
+        utils::trim(s);
         current.title = s;
       } else {
         current.str = s;
@@ -146,8 +99,7 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       current.state = Leaf::DONE;
     } else if (t.type == Token::tree_node_nesting_value) {
       if (!current.str.empty()) {
-        rtrim(current.str);
-        ltrim(current.str);
+        utils::trim(current.str);
       }
       Leaf l{};
       l.level = t.int_value;
