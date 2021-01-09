@@ -258,6 +258,10 @@ void display_help(string_view executable_name) {
        << "\n";
   cout << '\t' << " to list all the GOALS, in compact form"
        << "\n";
+  cout << executable_name << " GOAL input.org"
+       << "\n";
+  cout << '\t' << " to get info for a GOAL"
+       << "\n";
 }
 int main(int argc, char **argv) {
   vector<string> arguments(argv, argv + argc);
@@ -277,7 +281,7 @@ int main(int argc, char **argv) {
     }
   }
   if (arguments[1] != "TODO" && arguments[1] != "NEXT" &&
-      arguments[1] != "GOALS") {
+      arguments[1] != "GOALS" && arguments[1] != "GOAL") {
     cout << "Unknown state tag:'" << arguments[1] << "'"
          << "\n";
     display_help(arguments.front());
@@ -287,6 +291,50 @@ int main(int argc, char **argv) {
   const auto tokens = tokenize(file);
   const auto tree = parse_tree(tokens, compact);
 
+  if (arguments[1] == "GOAL") {
+    if (arguments.size() < 4) {
+      cout << "Missing goal name after GOAL option\n";
+      display_help(arguments.front());
+      return -1;
+    }
+    const auto goal_name = arguments[2];
+    // find goal boundary
+    int start_i = -1;
+    int end_i = tree.size();
+    size_t goal_level = 0;
+    for (size_t i = 0; i < tree.size(); ++i) {
+      auto &t = tree[i];
+      if (start_i == -1) {
+        if (auto pos = t.title.find(goal_name); pos == 0) {
+          start_i = i;
+          goal_level = t.level;
+        }
+      } else {
+        if (t.level <= goal_level) {
+          end_i = i;
+          break;
+        }
+      }
+    }
+    const auto &goal = tree[start_i];
+    cout << c_half_bright("           Goal: ") << c_bold(c_green((goal.title)))
+         << '\n';
+    cout << c_half_bright("Tasks:") << '\n';
+    for (size_t i = start_i + 1; i < end_i; ++i) {
+      auto &t = tree[i];
+      if (t.local_goal_numbering.size() == 1) {
+        cout << c_half_bright(to_string(t.local_goal_numbering.front()))
+             << c_half_bright(" - ");
+        if (t.state == Leaf::State::DONE || t.state == Leaf::State::_) {
+          cout << c_half_bright((to_string(t.state))) << " ";
+          cout << c_half_bright(":  ") << c_half_bright(t.title) << '\n';
+        } else {
+          cout << c_bold(c_green(to_string(t.state))) << " ";
+          cout << c_half_bright(":  ") << (t.title) << '\n';
+        }
+      }
+    }
+  }
   if (arguments[1] == "GOALS") {
     for (size_t i = 0; i < tree.size(); ++i) {
       auto &t = tree[i];
