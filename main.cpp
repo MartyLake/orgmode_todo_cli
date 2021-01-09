@@ -105,6 +105,8 @@ struct Leaf {
   bool has_TODO_child{false};
   bool has_NEXT_child{false};
   bool is_goal{false};
+  size_t parent_id{static_cast<size_t>(-1)};
+  vector<size_t> local_goal_numbering;
 };
 string to_string(Leaf::State s) {
   switch (s) {
@@ -118,6 +120,16 @@ string to_string(Leaf::State s) {
     return "DONE";
   }
   return "*UNIMPLEMENTED*";
+}
+string local_goal_numbering_to_string(vector<size_t> local_goal_numbering) {
+  string s;
+  for (const auto i : local_goal_numbering) {
+    if (!s.empty()) {
+      s += ".";
+    }
+    s += to_string(i);
+  }
+  return s;
 }
 vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
   vector<Leaf> children;
@@ -185,15 +197,63 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       parsing_title = true;
     }
   }
+  if (!children.empty()) {
+    size_t last_parent_id = 0;
+    // Update parent_id
+    for (size_t i = 0; i < children.size(); ++i) {
+      auto &l = children[i];
+      if (l.parent_id != static_cast<size_t>(-1)) {
+        continue;
+      }
+      if (l.level <= 1) {
+        l.parent_id = 0;
+        continue;
+      }
+      while (l.level <= children[last_parent_id].level) {
+        last_parent_id = children[last_parent_id].parent_id;
+      }
+      l.parent_id = last_parent_id;
+      last_parent_id = i;
+    }
+    // Update local_goal_numbering
+    for (size_t i = 0; i < children.size(); ++i) {
+      const auto &goal = children[i];
+      if (goal.is_goal) {
+        const auto goal_id = i;
+        const auto goal_level = goal.level;
+        vector<size_t> current_numbering{};
+        size_t current_level = 0;
+        for (++i; i < children.size() && children[i].level > goal_level; ++i) {
+          auto &l = children[i];
+          l.is_goal = false; // keep only top goal
+          if (current_level == l.level) {
+            current_numbering.back()++;
+          } else if (current_level < l.level) {
+            current_numbering.push_back(1);
+          } else {
+            current_numbering.pop_back();
+            current_numbering.back()++;
+          }
+          current_level = l.level;
+          l.local_goal_numbering = current_numbering;
+        }
+      }
+    }
+  }
   return children;
 }
 // main
 void display_help(string_view executable_name) {
-  cout << "Usage:" << endl;
-  cout << executable_name << " TODO input.org" << endl;
-  cout << '\t' << " to get all the TODOs" << endl;
-  cout << executable_name << " NEXT --compact input.org" << endl;
-  cout << '\t' << " to get all the NEXTs, in compact form" << endl;
+  cout << "Usage:"
+       << "\n";
+  cout << executable_name << " TODO input.org"
+       << "\n";
+  cout << '\t' << " to get all the TODOs"
+       << "\n";
+  cout << executable_name << " NEXT --compact input.org"
+       << "\n";
+  cout << '\t' << " to get all the NEXTs, in compact form"
+       << "\n";
 }
 int main(int argc, char **argv) {
   vector<string> arguments(argv, argv + argc);
@@ -213,7 +273,8 @@ int main(int argc, char **argv) {
     }
   }
   if (arguments[1] != "TODO" && arguments[1] != "NEXT") {
-    cout << "Unknown state tag:'" << arguments[1] << "'" << endl;
+    cout << "Unknown state tag:'" << arguments[1] << "'"
+         << "\n";
     display_help(arguments.front());
     return -1;
   }
@@ -228,12 +289,20 @@ int main(int argc, char **argv) {
       max_level = max(max_level, t.level);
     }
   }
-  for (const auto &t : tree) {
+  for (size_t i = 0; i < tree.size(); ++i) {
+    auto &t = tree[i];
     if ((arguments[1] == "TODO" && t.has_TODO_child) ||
         (arguments[1] == "NEXT" && t.has_NEXT_child)) {
+      // cout << "id:" << i << "\t" << "p_id:" << t.parent_id << "\t" << "g:" <<
+      // local_goal_numbering_to_string(t.local_goal_numbering) << "\t";
       if (t.level > 0) {
-        cout << c_half_bright(string(t.level - 1, '|')) << c_bold({"*"})
-             << c_blue(c_half_bright(string(max_level - t.level, '.'))) << " ";
+        cout << c_half_bright(string(t.level - 1, '|')) << c_bold({"*"});
+        if (t.is_goal) {
+          cout << c_magenta(c_bold(string(max_level - t.level, '.'))) << " ";
+        } else {
+          cout << c_blue(c_half_bright(string(max_level - t.level, '.')))
+               << " ";
+        }
       } else {
         cout << (string(max_level + 1, ' '));
       }
@@ -244,15 +313,19 @@ int main(int argc, char **argv) {
       } else {
         cout << c_bold(c_green(to_string(t.state))) << " ";
       }
+      if (!t.local_goal_numbering.empty()) {
+        cout << c_half_bright(
+            local_goal_numbering_to_string(t.local_goal_numbering) + ") ");
+      }
       cout << t.title;
       if (!compact && !t.str.empty() && t.level > 0) {
         const string filler = string(t.level - 1, '|') + "|" +
                               string(max_level - t.level, ' ') + " " + "     ";
         string text = t.str;
         utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
-        cout << endl << c_half_bright(c_blue(filler)) << c_half_bright(text);
+        cout << c_half_bright(c_blue(filler)) << c_half_bright(text);
       }
-      cout << endl;
+      cout << "\n";
     }
   }
   return 0;
