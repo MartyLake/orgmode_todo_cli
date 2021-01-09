@@ -254,6 +254,10 @@ void display_help(string_view executable_name) {
        << "\n";
   cout << '\t' << " to get all the NEXTs, in compact form"
        << "\n";
+  cout << executable_name << " GOALS --compact input.org"
+       << "\n";
+  cout << '\t' << " to list all the GOALS, in compact form"
+       << "\n";
 }
 int main(int argc, char **argv) {
   vector<string> arguments(argv, argv + argc);
@@ -272,7 +276,8 @@ int main(int argc, char **argv) {
       continue;
     }
   }
-  if (arguments[1] != "TODO" && arguments[1] != "NEXT") {
+  if (arguments[1] != "TODO" && arguments[1] != "NEXT" &&
+      arguments[1] != "GOALS") {
     cout << "Unknown state tag:'" << arguments[1] << "'"
          << "\n";
     display_help(arguments.front());
@@ -282,50 +287,92 @@ int main(int argc, char **argv) {
   const auto tokens = tokenize(file);
   const auto tree = parse_tree(tokens, compact);
 
-  size_t max_level = 0;
-  for (const auto &t : tree) {
-    if ((arguments[1] == "TODO" && t.has_TODO_child) ||
-        (arguments[1] == "NEXT" && t.has_NEXT_child)) {
-      max_level = max(max_level, t.level);
-    }
-  }
-  for (size_t i = 0; i < tree.size(); ++i) {
-    auto &t = tree[i];
-    if ((arguments[1] == "TODO" && t.has_TODO_child) ||
-        (arguments[1] == "NEXT" && t.has_NEXT_child)) {
-      // cout << "id:" << i << "\t" << "p_id:" << t.parent_id << "\t" << "g:" <<
-      // local_goal_numbering_to_string(t.local_goal_numbering) << "\t";
-      if (t.level > 0) {
-        cout << c_half_bright(string(t.level - 1, '|')) << c_bold({"*"});
-        if (t.is_goal) {
-          cout << c_magenta(c_bold(string(max_level - t.level, '.'))) << " ";
-        } else {
-          cout << c_blue(c_half_bright(string(max_level - t.level, '.')))
-               << " ";
+  if (arguments[1] == "GOALS") {
+    for (size_t i = 0; i < tree.size(); ++i) {
+      auto &t = tree[i];
+      if (!t.is_goal) {
+        continue;
+      }
+      if (!compact) {
+        cout << c_half_bright("GOAL") << " ";
+      }
+      cout << c_bold(c_magenta(t.title)) << " ";
+      if (!compact) {
+        cout << '\n';
+        if (!t.str.empty()) {
+          const string filler = "     ";
+          string text = t.str;
+          utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
+          cout << c_half_bright(c_blue(filler)) << c_half_bright(text);
+          cout << '\n';
         }
-      } else {
-        cout << (string(max_level + 1, ' '));
       }
-      if (t.is_goal) {
-        cout << c_bold(c_magenta("GOAL")) << " ";
-      } else if (t.state == Leaf::State::DONE) {
-        cout << c_bold(c_blue(to_string(t.state))) << " ";
-      } else {
-        cout << c_bold(c_green(to_string(t.state))) << " ";
+      for (++i; i < tree.size() && tree[i].level > t.level; ++i) {
+        if (tree[i].state == Leaf::TODO || tree[i].state == Leaf::NEXT) {
+          cout << (c_half_bright(to_string(tree[i].state))) << " ";
+          cout << (tree[i].title);
+          if (!compact && !tree[i].str.empty()) {
+            const string filler = "     ";
+            string text = tree[i].str;
+            utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
+            cout << '\n';
+            cout << c_half_bright(c_blue(filler)) << c_half_bright(text);
+          }
+          cout << '\n';
+          break;
+        }
       }
-      if (!t.local_goal_numbering.empty()) {
-        cout << c_half_bright(
-            local_goal_numbering_to_string(t.local_goal_numbering) + ") ");
+      if (!compact) {
+        cout << '\n';
       }
-      cout << t.title;
-      if (!compact && !t.str.empty() && t.level > 0) {
-        const string filler = string(t.level - 1, '|') + "|" +
-                              string(max_level - t.level, ' ') + " " + "     ";
-        string text = t.str;
-        utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
-        cout << c_half_bright(c_blue(filler)) << c_half_bright(text);
+    }
+  } else {
+    size_t max_level = 0;
+    for (const auto &t : tree) {
+      if ((arguments[1] == "TODO" && t.has_TODO_child) ||
+          (arguments[1] == "NEXT" && t.has_NEXT_child)) {
+        max_level = max(max_level, t.level);
       }
-      cout << "\n";
+    }
+    for (size_t i = 0; i < tree.size(); ++i) {
+      auto &t = tree[i];
+      if ((arguments[1] == "TODO" && t.has_TODO_child) ||
+          (arguments[1] == "NEXT" && t.has_NEXT_child)) {
+        // cout << "id:" << i << "\t" << "p_id:" << t.parent_id << "\t" << "g:"
+        // << local_goal_numbering_to_string(t.local_goal_numbering) << "\t";
+        if (t.level > 0) {
+          cout << c_half_bright(string(t.level - 1, '|')) << c_bold({"*"});
+          if (t.is_goal) {
+            cout << c_magenta(c_bold(string(max_level - t.level, '.'))) << " ";
+          } else {
+            cout << c_blue(c_half_bright(string(max_level - t.level, '.')))
+                 << " ";
+          }
+        } else {
+          cout << (string(max_level + 1, ' '));
+        }
+        if (t.is_goal) {
+          cout << c_bold(c_magenta("GOAL")) << " ";
+        } else if (t.state == Leaf::State::DONE) {
+          cout << c_bold(c_blue(to_string(t.state))) << " ";
+        } else {
+          cout << c_bold(c_green(to_string(t.state))) << " ";
+        }
+        if (!t.local_goal_numbering.empty()) {
+          cout << c_half_bright(
+              local_goal_numbering_to_string(t.local_goal_numbering) + ") ");
+        }
+        cout << t.title;
+        if (!compact && !t.str.empty() && t.level > 0) {
+          const string filler = string(t.level - 1, '|') + "|" +
+                                string(max_level - t.level, ' ') + " " +
+                                "     ";
+          string text = t.str;
+          utils::replace_all(text, {"\n", "\n" + c_blue(filler)});
+          cout << c_half_bright(c_blue(filler)) << c_half_bright(text);
+        }
+        cout << "\n";
+      }
     }
   }
   return 0;
