@@ -1,4 +1,4 @@
-test: test.cpp build
+test: test.string_utils.cpp build
 	cmake --build build --target main_test && ./build/main_test
 run: main
 	./main

@@ -23,7 +23,10 @@ set_property(TARGET orgparse PROPERTY CXX_STANDARD 20)
 add_executable(main main.cpp)
 set_property(TARGET main PROPERTY CXX_STANDARD 20)
 target_link_libraries(main orgparse)
-add_executable(main_test test.cpp catch.cpp)
+add_executable(main_test
+    test.string_utils.cpp
+    catch.cpp
+)
 set_property(TARGET main_test PROPERTY CXX_STANDARD 20)
 target_link_libraries(main_test Catch2::Catch2 orgparse)
 catch_discover_tests(main_test)
