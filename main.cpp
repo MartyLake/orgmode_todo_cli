@@ -18,6 +18,10 @@ inline void rtrim(std::string &s) {
               .base(),
           s.end());
 }
+inline void trim(std::string &s) {
+  ltrim(s);
+  rtrim(s);
+}
 // end copy of
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
 // string utils from
@@ -157,6 +161,7 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
       }
       s.append(t.str_value);
       if (parsing_title) {
+        trim(s);
         current.title = s;
       } else {
         current.str = s;
