@@ -1,6 +1,6 @@
 test: build/main_test
 	./build/main_test
-build/main_test: *.cpp *.hpp
+build/main_test: *.cpp *.hpp build
 	cmake --build build --target main_test
 run: main
 	./main
