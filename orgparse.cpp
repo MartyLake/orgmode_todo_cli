@@ -2,10 +2,15 @@
 #include <tuple>
 
 using namespace std;
+
+Token::Token(Token::Type t, std::string s, size_t i)
+    : type(t), str_value(s), int_value(i) {}
+
 bool Token::operator==(const Token &other) const {
   return make_tuple(type, str_value, int_value) ==
          make_tuple(other.type, other.str_value, other.int_value);
 }
+bool Token::operator!=(const Token &other) const { return !(*this == other); }
 
 std::ostream &operator<<(std::ostream &os, Token::Type const &value) {
   switch (value) {

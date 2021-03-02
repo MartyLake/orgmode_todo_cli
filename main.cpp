@@ -209,7 +209,7 @@ int main(int argc, char **argv) {
         continue;
       if (p.path().extension() != ".org")
         continue;
-      ifstream file(p);
+      ifstream file(p.path());
       auto other_tokens = tokenize(file);
       tokens.insert(tokens.end(), std::make_move_iterator(other_tokens.begin()),
                     std::make_move_iterator(other_tokens.end()));
