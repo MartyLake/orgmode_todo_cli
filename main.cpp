@@ -1,5 +1,7 @@
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -197,9 +199,24 @@ int main(int argc, char **argv) {
     display_help(arguments.front());
     return -1;
   }
-  ifstream file(arguments.back());
-  const auto tokens = tokenize(file);
-  const auto tree = parse_tree(tokens, compact);
+  const auto target = arguments.back();
+  std::vector<Token> tokens;
+  if (std::filesystem::is_directory(target)) {
+    for (const auto &p : std::filesystem::directory_iterator(target)) {
+      if (!std::filesystem::is_regular_file(p))
+        continue;
+      if (p.path().extension() != ".org")
+        continue;
+      ifstream file(p);
+      auto other_tokens = tokenize(file);
+      tokens.insert(tokens.end(), std::make_move_iterator(other_tokens.begin()),
+                    std::make_move_iterator(other_tokens.end()));
+    }
+  } else {
+    ifstream file(target);
+    tokens = tokenize(file);
+  }
+  std::vector<Leaf> tree = parse_tree(tokens, compact);
 
   if (arguments[1] == "GOAL") {
     if (arguments.size() < 4) {
