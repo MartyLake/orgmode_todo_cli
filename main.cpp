@@ -143,7 +143,9 @@ vector<Leaf> parse_tree(const vector<Token> &tokens, const bool compact) {
           } else if (current_level < l.level) {
             current_numbering.push_back(1);
           } else {
-            current_numbering.pop_back();
+            while (current_numbering.size() > l.level) {
+              current_numbering.pop_back();
+            }
             current_numbering.back()++;
           }
           current_level = l.level;
